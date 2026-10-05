@@ -378,6 +378,12 @@ def foreground_window():
     return GetForegroundWindow()
 
 
+def foreground_is_ours():
+    pid = wintypes.DWORD()
+    GetWindowThreadProcessId(GetForegroundWindow(), ctypes.byref(pid))
+    return pid.value == os.getpid()
+
+
 def toplevel_of(hwnd):
     return GetAncestor(hwnd, GA_ROOT)
 

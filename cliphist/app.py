@@ -179,6 +179,7 @@ def main():
         win32.message_box("Clipboard History is already running. Its icon is in the notification "
                           "area of the taskbar.")
         return
+    previous = win32.foreground_window()
     root = tk.Tk()
     root.withdraw()
     root.report_callback_exception = lambda *exc_info: logging.error("UI error", exc_info=exc_info)
@@ -189,4 +190,9 @@ def main():
         win32.message_box("Clipboard History could not start. Details are in %s" % log_path)
         root.destroy()
         return
+    # Tk activates its hidden main window when it creates it, which would leave the user typing
+    # into nothing. Give the focus back to the window that had it.
+    root.update()
+    if previous and win32.foreground_is_ours():
+        win32.activate(previous)
     root.mainloop()

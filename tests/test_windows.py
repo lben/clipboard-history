@@ -282,13 +282,9 @@ class EndToEndTest(unittest.TestCase):
         self.wait(lambda: self.saved_entries()[:1] == [("text", "alpha")], 20, "the new order")
         self.app.kill()
         self.app.wait()
-        time.sleep(1)
-        active_after_kill = self.target_active()
         self.launch()
         time.sleep(1)
-        print("\ntarget active after killing the app: %s, after starting it again: %s"
-              % (active_after_kill, self.target_active()), file=sys.stderr)
-        self.activate_target()  # as a user would be typing in it
+        self.assertTrue(self.target_active(), "starting the app took the focus away")
         press(win32.VK_CONTROL, VK_SHIFT, win32.VK_V)
         self.wait(lambda: overlay_active(self.app.pid), 5, "the overlay after a restart")
         press(VK_RETURN)
