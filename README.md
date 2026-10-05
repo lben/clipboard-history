@@ -56,7 +56,7 @@ You never need to type a password: Windows unlocks the encrypted history when yo
 
 | Key | Action |
 | --- | --- |
-| Up / Down, Page Up / Page Down | Move |
+| Up / Down | Move |
 | Enter | Paste the entry (Shift+Enter: only copy it, without pasting) |
 | Typing | Filter the list; Backspace edits the filter |
 | Del | Remove the entry |

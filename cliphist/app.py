@@ -13,6 +13,7 @@ from .overlay import Overlay
 
 POLL_MS = 40
 SAVE_DELAY_MS = 1000
+SAVE_RETRY_MS = 5000
 PASTE_DELAY_MS = 80
 
 
@@ -128,6 +129,8 @@ class App:
             history_store.save(self.history, self.history_path, win32.protect)
         except Exception:
             logging.exception("Could not save the history")
+            # Another program (an antivirus scan, for example) can hold the file briefly.
+            self._save_pending = self.root.after(SAVE_RETRY_MS, self.save)
             if not self._save_warned:
                 self._save_warned = True
                 self.listener.notify(win32.APP_NAME, "Could not save the history to disk.")
@@ -144,6 +147,8 @@ class App:
         if self._save_pending is not None:
             self.root.after_cancel(self._save_pending)
         self.save()
+        if self._save_pending is not None:  # the final save failed; nothing more can be done
+            self.root.after_cancel(self._save_pending)
         self.listener.stop()
         self._quitting = True
         self.root.destroy()

@@ -294,11 +294,11 @@ def _until_nul(data, wide=False):
 def read_clipboard(hwnd):
     """Return a history Entry for the current clipboard content, or None when there is nothing
     usable or the content asks not to be recorded."""
-    if IsClipboardFormatAvailable(CF_EXCLUDE) or IsClipboardFormatAvailable(CF_VIEWER_IGNORE):
-        return None
     paths, raw = None, {}
     _open_clipboard(hwnd)
-    try:
+    try:  # check the "do not record" flags while the clipboard is locked, so they match the data
+        if IsClipboardFormatAvailable(CF_EXCLUDE) or IsClipboardFormatAvailable(CF_VIEWER_IGNORE):
+            return None
         allowed = _get(CF_CAN_INCLUDE)
         if allowed is not None and allowed[:4] == b"\0\0\0\0":
             return None

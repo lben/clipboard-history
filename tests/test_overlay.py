@@ -97,6 +97,14 @@ class OverlayTest(unittest.TestCase):
         self.key("<Down>")
         self.assertEqual(len(preview.image_names()), 1)
 
+    def test_malformed_html_falls_back_to_plain_text(self):
+        self.overlay.hide()
+        self.history.add(text_entry("secret pin 1234", html="<p><![ secret pin 1234</p>"))
+        self.overlay.show((0, 0, 1200, 900), (0, 0, 1200, 900))
+        self.root.update()
+        self.assertTrue(self.overlay.visible)
+        self.assertEqual(self.overlay.preview.get("1.0", "end-1c"), "secret pin 1234")
+
     def test_escape_closes_and_restores_focus(self):
         self.key("<Escape>")
         self.assertEqual(self.cancelled, [True])

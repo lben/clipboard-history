@@ -19,7 +19,6 @@ MONO_FONT = "Consolas"
 WIDTH, LIST_HEIGHT, PREVIEW_HEIGHT = 640, 360, 190  # pixels at 96 DPI
 PREVIEW_IMAGE = (600, 170)
 PREVIEW_CHARS = 20000
-PAGE = 5
 HINT = "Enter paste    Del remove    Ctrl+P pin    → open bundle    Esc close"
 # Tk modifier bits on Windows
 STATE_SHIFT, STATE_CONTROL, STATE_ALT = 0x1, 0x4, 0x20000
@@ -80,7 +79,7 @@ class Overlay:
         self.header = tk.Label(top, bg=BG, fg=DIM, font=self.small, anchor="w", padx=px(10), pady=px(6))
         self.header.pack(fill="x")
         self.canvas = tk.Canvas(top, bg=BG, highlightthickness=0, width=px(WIDTH),
-                                height=px(LIST_HEIGHT), yscrollincrement=px(24))
+                                height=px(LIST_HEIGHT))
         self.canvas.pack(fill="x")
         self.inner = tk.Frame(self.canvas, bg=BG)
         self.canvas.create_window(0, 0, window=self.inner, anchor="nw", width=px(WIDTH))
@@ -97,11 +96,8 @@ class Overlay:
         tk.Label(top, text=HINT, bg=BG, fg=DIM, font=self.small, anchor="w", padx=px(10),
                  pady=px(5)).pack(fill="x")
 
-        for widget in (self.canvas, self.inner):
-            widget.bind("<MouseWheel>", self._wheel)
         bindings = {
             "<Up>": lambda e: self._move(-1), "<Down>": lambda e: self._move(1),
-            "<Prior>": lambda e: self._move(-PAGE), "<Next>": lambda e: self._move(PAGE),
             "<Return>": self._choose, "<KP_Enter>": self._choose,
             "<Escape>": lambda e: self.cancel(), "<Delete>": lambda e: self._delete(),
             "<Control-p>": lambda e: self._pin(), "<Control-P>": lambda e: self._pin(),
@@ -132,6 +128,7 @@ class Overlay:
         self.top.deiconify()
         self.top.lift()
         self.top.focus_force()
+        self.top.update_idletasks()  # the window must exist before on_shown activates it
         self.visible = True
         if self.on_shown:
             self.on_shown(self.top)
@@ -223,10 +220,6 @@ class Overlay:
             first = next((line.strip() for line in entry.text.splitlines() if line.strip()), "")
             text(first.replace("\t", "    "))
 
-        for widget in [row] + row.winfo_children():
-            widget.bind("<Button-1>", lambda e, n=n: self._select(n))
-            widget.bind("<Double-Button-1>", lambda e, n=n: (self._select(n), self._choose(e)))
-            widget.bind("<MouseWheel>", self._wheel)
         return row
 
     def _paint(self, widget, color):
@@ -253,10 +246,6 @@ class Overlay:
         elif row.winfo_y() + row.winfo_height() > top + view:
             self.canvas.yview_moveto((row.winfo_y() + row.winfo_height() - view) / region)
         self._show_preview(self.items[index])
-
-    def _wheel(self, event):
-        steps = -int(event.delta / 120) or (-1 if event.delta > 0 else 1)
-        self.canvas.yview_scroll(steps, "units")
 
     # ------------------------------------------------------------ preview
 
@@ -291,8 +280,11 @@ class Overlay:
         key = ("runs", entry.id)
         if key not in self._cache:
             html = entry.data("html")
-            self._cache[key] = formats.html_runs(formats.html_fragment(html),
-                                                 PREVIEW_CHARS) if html else None
+            try:
+                runs = formats.html_runs(formats.html_fragment(html), PREVIEW_CHARS) if html else None
+            except Exception:  # malformed HTML: show plain text; never log it (it is clipboard content)
+                runs = None
+            self._cache[key] = runs
         return self._cache[key]
 
     def _photo(self, kind, entry):

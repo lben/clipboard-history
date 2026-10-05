@@ -184,23 +184,37 @@ class EndToEndTest(unittest.TestCase):
     """Runs the real app and a target window, using SendInput like a user would."""
 
     def start(self, settings):
-        self.folder = tempfile.mkdtemp()
-        data = os.path.join(self.folder, "ClipboardHistory")
-        os.makedirs(data)
-        with open(os.path.join(data, "settings.json"), "w", encoding="utf-8") as f:
+        folder = tempfile.mkdtemp()
+        self.data = os.path.join(folder, "ClipboardHistory")
+        os.makedirs(self.data)
+        with open(os.path.join(self.data, "settings.json"), "w", encoding="utf-8") as f:
             json.dump(settings, f)
-        env = dict(os.environ, LOCALAPPDATA=self.folder)
+        self.env = dict(os.environ, LOCALAPPDATA=folder)
+        self.history_path = os.path.join(self.data, "history.bin")
+        self.launch()
+
+    def launch(self):
+        log = os.path.join(self.data, "app.log")
+        starts = (read_file(log) or "").count("Started")
         self.app = subprocess.Popen([sys.executable, os.path.join(ROOT, "clipboard_history.pyw")],
-                                    env=env)
+                                    env=self.env)
+        self.addCleanup(self.app.wait)
         self.addCleanup(self.app.kill)
-        log = os.path.join(data, "app.log")
-        wait_for(lambda: "Started" in (read_file(log) or ""), 20, "the app to start")
-        self.history_path = os.path.join(data, "history.bin")
+        wait_for(lambda: (read_file(log) or "").count("Started") > starts, 20, "the app to start")
+
+    def saved_entries(self):
+        try:
+            with open(self.history_path, "rb") as f:
+                sealed = f.read()
+        except OSError:
+            return []
+        return [(e.kind, e.text) for e in history.loads(win32.unprotect(sealed), 20).entries]
 
     def open_target(self):
         target_dir = tempfile.mkdtemp()
         target = subprocess.Popen([sys.executable, os.path.join(ROOT, "tests", "target_app.py"),
                                    target_dir])
+        self.addCleanup(target.wait)
         self.addCleanup(target.kill)
         ready = wait_for(lambda: read_file(os.path.join(target_dir, "ready.txt")), 20,
                          "the target window")
@@ -224,16 +238,10 @@ class EndToEndTest(unittest.TestCase):
             win32.write_clipboard(clipboard_hwnd(), entry)
             time.sleep(0.5)
 
-        def saved():
-            if not os.path.exists(self.history_path):
-                return None
-            with open(self.history_path, "rb") as f:
-                entries = history.loads(win32.unprotect(f.read()), 20).entries
-            return [(e.kind, e.text) for e in entries] == [
-                ("text", "beta"), ("text", "alpha"), ("text", "Meeting notes"),
-                ("image", "Image 160 \u00d7 90"), ("files", path)]
-
-        wait_for(saved, 10, "all copies in the encrypted history file")
+        expected = [("text", "beta"), ("text", "alpha"), ("text", "Meeting notes"),
+                    ("image", "Image 160 \u00d7 90"), ("files", path)]
+        wait_for(lambda: self.saved_entries() == expected, 20,
+                 "all copies in the encrypted history file")
 
         target_dir = self.open_target()
         press(win32.VK_CONTROL, VK_SHIFT, win32.VK_V)
@@ -241,9 +249,19 @@ class EndToEndTest(unittest.TestCase):
         press(VK_DOWN)
         screenshot("overlay")
         press(VK_RETURN)
-        wait_for(lambda: read_file(os.path.join(target_dir, "text.txt")) == "alpha", 5,
-                 "the pasted text")
+        pasted = os.path.join(target_dir, "text.txt")
+        wait_for(lambda: read_file(pasted) == "alpha", 5, "the pasted text")
         self.assertEqual(visible_windows(self.app.pid), [])
+
+        # The pasted entry moved to the top; after a restart it is still there.
+        wait_for(lambda: self.saved_entries()[:1] == [("text", "alpha")], 20, "the new order")
+        self.app.kill()
+        self.app.wait()
+        self.launch()
+        press(win32.VK_CONTROL, VK_SHIFT, win32.VK_V)
+        wait_for(lambda: visible_windows(self.app.pid), 5, "the overlay after a restart")
+        press(VK_RETURN)
+        wait_for(lambda: read_file(pasted) == "alphaalpha", 5, "the second paste")
 
     def test_excluded_app_receives_the_hotkey_itself(self):
         self.start({"excluded_apps": [os.path.basename(sys.executable)]})
