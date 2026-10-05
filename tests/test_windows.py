@@ -237,11 +237,17 @@ class EndToEndTest(unittest.TestCase):
         self.addCleanup(target.kill)
         ready = wait_for(lambda: read_file(os.path.join(target_dir, "ready.txt")), 20,
                          "the target window")
-        x, y, width, height, hwnd = map(int, ready.split())
-        click(x + width // 2, y + height // 2)
-        wait_for(lambda: win32.toplevel_of(win32.foreground_window()) == hwnd, 5,
-                 "the target window to become active")
+        x, y, width, height, self.target_hwnd = map(int, ready.split())
+        self.target_center = (x + width // 2, y + height // 2)
+        self.activate_target()
         return target_dir
+
+    def target_active(self):
+        return win32.toplevel_of(win32.foreground_window()) == self.target_hwnd
+
+    def activate_target(self):
+        click(*self.target_center)
+        wait_for(self.target_active, 5, "the target window to become active")
 
     def test_hotkey_overlay_and_paste_into_the_active_window(self):
         self.start({"excluded_apps": [], "auto_paste": True})
@@ -277,6 +283,8 @@ class EndToEndTest(unittest.TestCase):
         self.app.kill()
         self.app.wait()
         self.launch()
+        print("\ntarget active after the restart: %s" % self.target_active(), file=sys.stderr)
+        self.activate_target()  # as a user would be typing in it
         press(win32.VK_CONTROL, VK_SHIFT, win32.VK_V)
         self.wait(lambda: overlay_active(self.app.pid), 5, "the overlay after a restart")
         press(VK_RETURN)
