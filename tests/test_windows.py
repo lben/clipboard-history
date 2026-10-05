@@ -170,6 +170,14 @@ def screenshot(name):
     subprocess.run(["powershell", "-NoProfile", "-Command", script], check=False)
 
 
+def overlay_active(pid):
+    """True when a visible window of process pid has the keyboard focus."""
+    window = win32.foreground_window()
+    owner = wintypes.DWORD()
+    win32.GetWindowThreadProcessId(window, ctypes.byref(owner))
+    return owner.value == pid and bool(user32.IsWindowVisible(window))
+
+
 def read_file(path):
     try:
         with open(path, encoding="utf-8") as f:
@@ -202,6 +210,17 @@ class EndToEndTest(unittest.TestCase):
         self.addCleanup(self.app.kill)
         wait_for(lambda: (read_file(log) or "").count("Started") > starts, 20, "the app to start")
 
+    def wait(self, condition, timeout, message):
+        """wait_for, plus a screenshot, the app log and the target text when it times out."""
+        try:
+            return wait_for(condition, timeout, message)
+        except AssertionError:
+            screenshot("failed " + message)
+            log = read_file(os.path.join(self.data, "app.log")) or ""
+            text = read_file(os.path.join(self.target_dir, "text.txt"))
+            raise AssertionError("timed out waiting for %s\ntarget text: %r\napp.log:\n%s"
+                                 % (message, text, log[-3000:]))
+
     def saved_entries(self):
         try:
             with open(self.history_path, "rb") as f:
@@ -211,7 +230,7 @@ class EndToEndTest(unittest.TestCase):
         return [(e.kind, e.text) for e in history.loads(win32.unprotect(sealed), 20).entries]
 
     def open_target(self):
-        target_dir = tempfile.mkdtemp()
+        self.target_dir = target_dir = tempfile.mkdtemp()
         target = subprocess.Popen([sys.executable, os.path.join(ROOT, "tests", "target_app.py"),
                                    target_dir])
         self.addCleanup(target.wait)
@@ -245,23 +264,23 @@ class EndToEndTest(unittest.TestCase):
 
         target_dir = self.open_target()
         press(win32.VK_CONTROL, VK_SHIFT, win32.VK_V)
-        wait_for(lambda: visible_windows(self.app.pid), 5, "the overlay")
+        self.wait(lambda: overlay_active(self.app.pid), 5, "the overlay")
         press(VK_DOWN)
         screenshot("overlay")
         press(VK_RETURN)
         pasted = os.path.join(target_dir, "text.txt")
-        wait_for(lambda: read_file(pasted) == "alpha", 5, "the pasted text")
+        self.wait(lambda: read_file(pasted) == "alpha", 5, "the pasted text")
         self.assertEqual(visible_windows(self.app.pid), [])
 
         # The pasted entry moved to the top; after a restart it is still there.
-        wait_for(lambda: self.saved_entries()[:1] == [("text", "alpha")], 20, "the new order")
+        self.wait(lambda: self.saved_entries()[:1] == [("text", "alpha")], 20, "the new order")
         self.app.kill()
         self.app.wait()
         self.launch()
         press(win32.VK_CONTROL, VK_SHIFT, win32.VK_V)
-        wait_for(lambda: visible_windows(self.app.pid), 5, "the overlay after a restart")
+        self.wait(lambda: overlay_active(self.app.pid), 5, "the overlay after a restart")
         press(VK_RETURN)
-        wait_for(lambda: read_file(pasted) == "alphaalpha", 5, "the second paste")
+        self.wait(lambda: read_file(pasted) == "alphaalpha", 5, "the second paste")
 
     def test_excluded_app_receives_the_hotkey_itself(self):
         self.start({"excluded_apps": [os.path.basename(sys.executable)]})

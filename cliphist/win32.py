@@ -546,6 +546,10 @@ class Listener(threading.Thread):
         if process_name(window) in self.settings.excluded_apps:
             self._unregister_hotkey()  # missed app switch; the next press reaches the app
             return
+        # Receiving the hotkey lets this app take the foreground, but only until the next input
+        # (releasing the keys) goes to another app. Claim it now; the UI thread then activates
+        # the overlay, which Windows allows because this app is already in the foreground.
+        SetForegroundWindow(self.hwnd)
         self.events.put(("hotkey", window))
 
     def _on_foreground(self, hook, event, hwnd, id_object, id_child, thread, event_time):

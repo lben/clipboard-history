@@ -90,7 +90,8 @@ class App:
             self.quit()
 
     def _activate_overlay(self, toplevel):
-        win32.activate(win32.toplevel_of(toplevel.winfo_id()))
+        if not win32.activate(win32.toplevel_of(toplevel.winfo_id())):
+            logging.warning("Windows did not let the overlay take the keyboard focus")
 
     def choose(self, entry, item, shift_held):
         try:
