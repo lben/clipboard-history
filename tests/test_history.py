@@ -71,7 +71,7 @@ class PersistenceTest(unittest.TestCase):
         files = next(e for e in loaded.entries if e.kind == "files")
         self.assertEqual((files.paths, files.dirs), ([r"C:\a", r"C:\b.txt"], [True, False]))
         image = next(e for e in loaded.entries if e.kind == "image")
-        self.assertEqual((image.size, image.data("dib")), ((3, 3), dib(3, 3)))
+        self.assertEqual((image.text, image.data("dib")), ("Image 3 \u00d7 3", dib(3, 3)))
 
     def test_missing_file_gives_empty_history(self):
         self.assertEqual(history.load("/nonexistent/history.bin", None, 20).entries, [])

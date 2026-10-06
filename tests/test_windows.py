@@ -94,7 +94,7 @@ class WindowsApiTest(unittest.TestCase):
     def test_image_round_trips(self):
         win32.write_clipboard(clipboard_hwnd(), history.build_entry({"dib": dib(5, 3)}))
         read = win32.read_clipboard(clipboard_hwnd())
-        self.assertEqual((read.kind, read.size), ("image", (5, 3)))
+        self.assertEqual((read.kind, read.text), ("image", "Image 5 \u00d7 3"))
         self.assertTrue(read.data("dib").startswith(dib(5, 3)))
 
     def test_copies_marked_private_are_not_recorded(self):
@@ -271,6 +271,8 @@ class EndToEndTest(unittest.TestCase):
         target_dir = self.open_target()
         press(win32.VK_CONTROL, VK_SHIFT, win32.VK_V)
         self.wait(lambda: overlay_active(self.app.pid), 5, "the overlay")
+        press(win32.VK_CONTROL, VK_SHIFT, win32.VK_V)  # a second press leaves it open and focused
+        self.assertTrue(overlay_active(self.app.pid), "a second hotkey press lost the overlay")
         press(VK_DOWN)
         screenshot("overlay")
         press(VK_RETURN)

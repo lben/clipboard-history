@@ -3,7 +3,6 @@ import base64
 import hashlib
 import json
 import os
-import time
 import zlib
 
 from . import formats
@@ -16,18 +15,16 @@ class Entry:
     """One clipboard item. formats maps 'text' (UTF-16-LE), 'html', 'rtf', 'dib' or 'png' to
     zlib-compressed bytes; file entries keep their paths instead."""
 
-    def __init__(self, kind, text, digest, formats=None, paths=None, dirs=None, size=None,
-                 thumb=None, pinned=False, created=None, id=None):
+    def __init__(self, kind, text, digest, formats=None, paths=None, dirs=None, thumb=None,
+                 pinned=False, id=None):
         self.kind = kind  # 'text', 'image' or 'files'
         self.text = text
         self.digest = digest
         self.formats = formats or {}
         self.paths = paths or []
         self.dirs = dirs or []
-        self.size = size
         self.thumb = thumb  # PPM bytes for image entries
         self.pinned = pinned
-        self.created = created or time.time()
         self.id = id or os.urandom(8).hex()
 
     def data(self, name):
@@ -55,15 +52,13 @@ def build_entry(raw=None, paths=None, dirs=None):
     for name in sorted(kept):
         digest.update(b"\0%s\0%d\0" % (name.encode(), len(kept[name])))
         digest.update(kept[name])
-    size = thumb = None
+    thumb = None
     if kind == "image":
-        size = formats.dib_size(kept["dib"])
-        text = "Image %d × %d" % size
+        text = "Image %d × %d" % formats.dib_size(kept["dib"])
         small = formats.dib_thumbnail(kept["dib"], *THUMB_SIZE)
         thumb = small[0] if small else None
     packed = {name: zlib.compress(data, 1) for name, data in kept.items()}
-    return Entry(kind, text[:TEXT_LIMIT], digest.hexdigest(), formats=packed, size=size,
-                 thumb=thumb)
+    return Entry(kind, text[:TEXT_LIMIT], digest.hexdigest(), formats=packed, thumb=thumb)
 
 
 class History:
@@ -132,7 +127,7 @@ def _unb64(text):
 def dumps(history):
     entries = [{
         "id": e.id, "kind": e.kind, "text": e.text, "digest": e.digest, "pinned": e.pinned,
-        "created": e.created, "paths": e.paths, "dirs": e.dirs, "size": e.size,
+        "paths": e.paths, "dirs": e.dirs,
         "thumb": _b64(e.thumb), "formats": {name: _b64(data) for name, data in e.formats.items()},
     } for e in history.entries]
     return json.dumps({"version": 1, "entries": entries}).encode("utf-8")
@@ -143,8 +138,8 @@ def loads(data, limit):
     entries = [Entry(
         d["kind"], d["text"], d["digest"],
         formats={name: _unb64(b) for name, b in d["formats"].items()},
-        paths=d["paths"], dirs=d["dirs"], size=tuple(d["size"]) if d["size"] else None,
-        thumb=_unb64(d["thumb"]), pinned=d["pinned"], created=d["created"], id=d["id"],
+        paths=d["paths"], dirs=d["dirs"], thumb=_unb64(d["thumb"]), pinned=d["pinned"],
+        id=d["id"],
     ) for d in document["entries"]]
     return History(limit, entries)
 

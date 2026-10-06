@@ -114,7 +114,6 @@ UnhookWinEvent = _bind(user32, "UnhookWinEvent", B, H)
 GetForegroundWindow = _bind(user32, "GetForegroundWindow", HWND)
 SetForegroundWindow = _bind(user32, "SetForegroundWindow", B, HWND)
 GetWindowThreadProcessId = _bind(user32, "GetWindowThreadProcessId", D, HWND, wintypes.LPDWORD)
-AttachThreadInput = _bind(user32, "AttachThreadInput", B, D, D, B)
 GetWindowRect = _bind(user32, "GetWindowRect", B, HWND, ctypes.POINTER(wintypes.RECT))
 IsIconic = _bind(user32, "IsIconic", B, HWND)
 MonitorFromWindow = _bind(user32, "MonitorFromWindow", H, HWND, D)
@@ -149,7 +148,6 @@ QueryFullProcessImageNameW = _bind(kernel32, "QueryFullProcessImageNameW", B, H,
                                    wintypes.LPWSTR, wintypes.LPDWORD)
 CloseHandle = _bind(kernel32, "CloseHandle", B, H)
 CreateMutexW = _bind(kernel32, "CreateMutexW", H, wintypes.LPVOID, B, LPCWSTR)
-GetCurrentThreadId = _bind(kernel32, "GetCurrentThreadId", D)
 Shell_NotifyIconW = _bind(shell32, "Shell_NotifyIconW", B, D, ctypes.POINTER(NOTIFYICONDATAW))
 CryptProtectData = _bind(crypt32, "CryptProtectData", B, ctypes.POINTER(DATA_BLOB), LPCWSTR,
                          ctypes.POINTER(DATA_BLOB), wintypes.LPVOID, wintypes.LPVOID, D,
@@ -198,10 +196,7 @@ _mutex = None
 
 
 def set_dpi_awareness():
-    try:
-        ctypes.WinDLL("shcore").SetProcessDpiAwareness(1)
-    except (OSError, AttributeError):
-        user32.SetProcessDPIAware()
+    ctypes.WinDLL("shcore").SetProcessDpiAwareness(1)
 
 
 def acquire_single_instance():
@@ -390,17 +385,7 @@ def toplevel_of(hwnd):
 
 def activate(hwnd):
     """Bring hwnd to the foreground. Returns True on success."""
-    if SetForegroundWindow(hwnd):
-        return True
-    other = GetWindowThreadProcessId(GetForegroundWindow(), None)
-    me = GetCurrentThreadId()
-    if not other or other == me:
-        return False
-    AttachThreadInput(me, other, True)
-    try:
-        return bool(SetForegroundWindow(hwnd))
-    finally:
-        AttachThreadInput(me, other, False)
+    return bool(SetForegroundWindow(hwnd))
 
 
 def window_rect(hwnd):
@@ -555,7 +540,8 @@ class Listener(threading.Thread):
         # Receiving the hotkey lets this app take the foreground, but only until the next input
         # (releasing the keys) goes to another app. Claim it now; the UI thread then activates
         # the overlay, which Windows allows because this app is already in the foreground.
-        SetForegroundWindow(self.hwnd)
+        if not foreground_is_ours():  # the overlay is already open and focused otherwise
+            SetForegroundWindow(self.hwnd)
         self.events.put(("hotkey", window))
 
     def _on_foreground(self, hook, event, hwnd, id_object, id_child, thread, event_time):
