@@ -274,6 +274,11 @@ class EndToEndTest(unittest.TestCase):
         press(win32.VK_CONTROL, VK_SHIFT, win32.VK_V)  # a second press leaves it open and focused
         self.assertTrue(overlay_active(self.app.pid), "a second hotkey press lost the overlay")
         press(VK_DOWN)
+        overlay = win32.window_rect(win32.foreground_window())
+        # Rest the mouse on the third row (rows are ~26 px below a ~28 px header at 96 DPI);
+        # hovering highlights it but Enter still takes the keyboard selection.
+        user32.SetCursorPos((overlay[0] + overlay[2]) // 2, overlay[1] + 94)
+        time.sleep(0.3)
         screenshot("overlay")
         press(VK_RETURN)
         pasted = os.path.join(target_dir, "text.txt")

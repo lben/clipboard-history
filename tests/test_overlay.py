@@ -95,6 +95,23 @@ class OverlayTest(unittest.TestCase):
         self.click(1)  # inside the bundle, one file
         self.assertEqual(self.chosen[-1], (bundle, 1, False))
 
+    def test_hovering_highlights_a_row_without_selecting_it(self):
+        from cliphist.overlay import BG, HOVER, SELECTED
+        rows = self.overlay.rows
+        label = rows[2].winfo_children()[-1]
+        label.event_generate("<Enter>")
+        self.root.update()
+        self.assertEqual((rows[0]["bg"], rows[2]["bg"], label["bg"]), (SELECTED, HOVER, HOVER))
+        self.assertEqual(self.overlay.index, 0)
+        rows[0].event_generate("<Enter>")  # the selected row stays selected-blue
+        self.root.update()
+        self.assertEqual((rows[0]["bg"], rows[2]["bg"]), (SELECTED, BG))
+        self.key("<Down>")  # the hovered row loses the selection but keeps the hover
+        self.assertEqual((rows[0]["bg"], rows[1]["bg"]), (HOVER, SELECTED))
+        rows[0].event_generate("<Leave>")
+        self.root.update()
+        self.assertEqual(rows[0]["bg"], BG)
+
     def test_bundle_opens_with_right_and_closes_with_left(self):
         for _ in range(4):
             self.key("<Down>")

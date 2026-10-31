@@ -7,6 +7,7 @@ from . import formats
 
 BG = "#2b2d30"
 SELECTED = "#2e436e"
+HOVER = "#393b40"
 FG = "#dfe1e5"
 DIM = "#9a9da3"
 ACCENT = "#e8b44c"
@@ -60,7 +61,8 @@ class Overlay:
         self.items = []  # (entry, item index inside a bundle or None)
         self.index = 0
         self.rows = []
-        self._painted = None
+        self._painted = None  # index of the row painted as selected
+        self._hovered = None  # index of the row under the mouse
         self._cache = {}  # PhotoImages (must stay referenced) and parsed HTML, keyed by entry id
         self._tags = set()
 
@@ -163,7 +165,7 @@ class Overlay:
 
         for row in self.rows:
             row.destroy()
-        self._painted = None
+        self._painted = self._hovered = None
         self.rows = [self._make_row(n, entry, child) for n, (entry, child) in enumerate(self.items)]
         if not self.items:
             empty = tk.Label(self.inner, text="No matches." if self.query else "Nothing copied yet.",
@@ -222,6 +224,8 @@ class Overlay:
 
         for widget in [row] + row.winfo_children():
             widget.bind("<Button-1>", lambda event, n=n: self._click(n, event))
+            widget.bind("<Enter>", lambda event, n=n: self._hover(n))
+            widget.bind("<Leave>", lambda event: self._hover(None))
         return row
 
     def _paint(self, widget, color):
@@ -229,12 +233,24 @@ class Overlay:
         for child in widget.winfo_children():
             self._paint(child, color)
 
+    def _row_color(self, index):
+        if index == self._painted:
+            return SELECTED
+        return HOVER if index == self._hovered else BG
+
+    def _hover(self, index):
+        previous, self._hovered = self._hovered, index
+        for i in (previous, index):
+            if i is not None and i < len(self.rows):
+                self._paint(self.rows[i], self._row_color(i))
+
     def _select(self, index):
         if not self.items:
             self._show_preview(None)
             return
-        if self._painted is not None and self._painted < len(self.rows):
-            self._paint(self.rows[self._painted], BG)
+        previous, self._painted = self._painted, index
+        if previous is not None and previous < len(self.rows):
+            self._paint(self.rows[previous], self._row_color(previous))
         self.index = index
         row = self.rows[index]
         self._paint(row, SELECTED)
