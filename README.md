@@ -58,6 +58,7 @@ You never need to type a password: Windows unlocks the encrypted history when yo
 | --- | --- |
 | Up / Down | Move |
 | Enter | Paste the entry (Shift+Enter: only copy it, without pasting) |
+| Click | Paste that entry, like Enter (Shift+click: only copy it) |
 | Typing | Filter the list; Backspace edits the filter |
 | Del | Remove the entry |
 | Ctrl+P | Pin or unpin. Pinned entries stay on top and are never pushed out |

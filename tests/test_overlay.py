@@ -76,6 +76,25 @@ class OverlayTest(unittest.TestCase):
         self.assertEqual(self.overlay.index, 0)  # the selection follows the pinned entry
         self.assertEqual(len(self.changes), 2)
 
+    def click(self, row, **options):
+        widget = self.overlay.rows[row].winfo_children()[-1]  # last label of the row
+        widget.event_generate("<Button-1>", x=2, y=2, **options)
+        self.root.update()
+
+    def test_clicking_a_row_chooses_it_like_enter(self):
+        self.click(1)
+        self.assertEqual(self.chosen, [(self.history.entries[1], None, False)])
+        self.click(2, state=0x1)  # Shift+click, like Shift+Enter: no automatic paste
+        self.assertEqual(self.chosen[-1], (self.history.entries[2], None, True))
+        bundle = self.history.entries[4]
+        self.click(4)  # the bundle row pastes all of its files
+        self.assertEqual(self.chosen[-1], (bundle, None, False))
+        for _ in range(4):
+            self.key("<Down>")
+        self.key("<Right>")
+        self.click(1)  # inside the bundle, one file
+        self.assertEqual(self.chosen[-1], (bundle, 1, False))
+
     def test_bundle_opens_with_right_and_closes_with_left(self):
         for _ in range(4):
             self.key("<Down>")

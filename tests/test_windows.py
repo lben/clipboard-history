@@ -289,8 +289,11 @@ class EndToEndTest(unittest.TestCase):
         self.assertTrue(self.target_active(), "starting the app took the focus away")
         press(win32.VK_CONTROL, VK_SHIFT, win32.VK_V)
         self.wait(lambda: overlay_active(self.app.pid), 5, "the overlay after a restart")
-        press(VK_RETURN)
-        self.wait(lambda: read_file(pasted) == "alphaalpha", 5, "the second paste")
+        overlay = win32.window_rect(win32.foreground_window())
+        # Click the first row: below the ~28 px header, at 96 DPI as on the CI machine.
+        click((overlay[0] + overlay[2]) // 2, overlay[1] + 42)
+        self.wait(lambda: read_file(pasted) == "alphaalpha", 5, "the paste by clicking")
+        self.assertEqual(visible_windows(self.app.pid), [])
 
     def test_excluded_app_receives_the_hotkey_itself(self):
         self.start({"excluded_apps": [os.path.basename(sys.executable)]})

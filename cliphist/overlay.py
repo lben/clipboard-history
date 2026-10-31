@@ -220,6 +220,8 @@ class Overlay:
             first = next((line.strip() for line in entry.text.splitlines() if line.strip()), "")
             text(first.replace("\t", "    "))
 
+        for widget in [row] + row.winfo_children():
+            widget.bind("<Button-1>", lambda event, n=n: self._click(n, event))
         return row
 
     def _paint(self, widget, color):
@@ -336,6 +338,10 @@ class Overlay:
     def _move(self, delta):
         if self.items:
             self._select(max(0, min(len(self.items) - 1, self.index + delta)))
+
+    def _click(self, index, event):
+        self.index = index
+        self._choose(event)
 
     def _choose(self, event):
         if self.items:
